@@ -1,0 +1,2216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ICBOT V33.0 - Masivos Excel</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/juanballen2/CHATBOT/main/images/iconboticc_Mesa%20de%20trabajo%201.svg" type="image/svg+xml">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <style>
+        :root {
+            --primary: #E9521E;      
+            --outgoing: #E9521E;     
+            --incoming: #515050;     
+            
+            --bg-main: #FFFFFF;      
+            --panel: #F5F6F6;        
+            --border: #D1D7DB;       
+            
+            --text: #333333;         
+            --text-muted: #777777;   
+            --accent: #E9521E;       
+            --danger: #ef4444;
+            --hover-item: #EBEBEB;   
+            --active-item: #FFEBE5;  
+            
+            --chat-bg-color: #E5E5E5;
+            --avatar-bg: #E0E0E0;
+            --avatar-color: #888888;
+            --icon-color: #515050;
+        }
+
+        [data-theme="dark"] {
+            --bg-main: #111b21;      
+            --panel: #202c33;        
+            --border: #37404a;       
+            
+            --text: #e9edef;         
+            --text-muted: #8696a0;   
+            --incoming: #202c33;     
+            --outgoing: #E9521E;     
+            --hover-item: #2a3942;   
+            --active-item: #3d2a23;  
+            
+            --chat-bg-color: #0b141a;
+            --avatar-bg: #37404a;
+            --avatar-color: #8696a0;
+            --icon-color: #8696a0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+        body { background-color: var(--bg-main); color: var(--text); height: 100vh; height: 100dvh; display: flex; overflow: hidden; }
+
+        .modal-overlay { display: none; position: fixed; z-index: 5000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); align-items: center; justify-content: center; backdrop-filter: blur(3px); transition: all 0.3s; }
+        .modal-overlay.show { display: flex; animation: fadeIn 0.2s; }
+        .modal-content { background-color: var(--bg-main); padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 15px; max-height: 90dvh; overflow-y: auto; }
+        .modal-title { font-size: 1.2rem; color: var(--text); font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .modal-form label { display: block; margin-bottom: 5px; font-size: 0.85rem; color: var(--primary); font-weight: 600; }
+        .modal-form input, .modal-form textarea, .modal-form select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text); outline: none; font-size: 0.95rem; transition: border 0.3s, box-shadow 0.3s; }
+        .modal-form input:focus, .modal-form textarea:focus, .modal-form select:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(233, 82, 30, 0.3); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+
+        button { cursor: pointer; transition: all 0.2s ease-in-out; }
+        button:active { transform: scale(0.95); }
+        button:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        button:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+        .chat-item { transition: all 0.1s ease-in-out; }
+        .chat-item:active { transform: scale(0.98); }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--incoming); }
+
+        .sidebar { width: 60px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 20px; z-index: 100; flex-shrink: 0; }
+        .nav-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--icon-color); font-size: 1.2rem; cursor: pointer; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; }
+        .nav-btn:hover { background: var(--hover-item); color: var(--primary); }
+        .nav-btn.active { background: var(--bg-main); color: var(--primary); box-shadow: 0 0 10px rgba(233, 82, 30, 0.3); border: 1px solid var(--border); }
+        .nav-bottom { margin-top: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 10px;}
+
+        .main-area { flex: 1; display: flex; position: relative; overflow: hidden; background: var(--bg-main); }
+        .view-panel { display: none; width: 100%; height: 100%; }
+        #tab-chat.active { display: flex; flex-direction: row; }
+        #tab-leads.active, #tab-config.active { display: flex; flex-direction: column; overflow-y: auto; }
+
+        .chat-list { width: 380px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-main); flex-shrink: 0; position: relative; }
+        .chat-header { padding: 10px 15px; border-bottom: 1px solid var(--border); background: var(--panel); }
+        .search-container { display: flex; gap: 8px; margin-bottom: 10px; }
+        .search-bar { flex: 1; padding: 8px 12px; background: var(--bg-main); border: 1px solid var(--border); color: var(--text); border-radius: 8px; outline: none; font-size: 0.9rem; transition: border 0.3s; }
+        .search-bar:focus { border-color: var(--primary); }
+        .action-btn { width: 36px; height: 36px; border-radius: 8px; border: none; background: var(--bg-main); color: var(--icon-color); cursor: pointer; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+        .action-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .new-chat-btn { background: var(--primary); color: #fff; border: none; }
+        
+        .view-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; align-items: center; }
+        .filter-chip { font-size: 0.8rem; padding: 5px 12px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; white-space: nowrap; color: var(--text-muted); transition: 0.2s; }
+        .filter-chip:hover { background: var(--hover-item); color: var(--primary); border-color: var(--primary); }
+        .filter-chip.active { background: var(--primary); color: #FFF; border-color: var(--primary); font-weight: 600; }
+        .tag-filter-select { background: var(--bg-main); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px; font-size: 0.8rem; max-width: 120px; outline:none; }
+
+        .chat-items { flex: 1; overflow-y: auto; background: var(--bg-main); }
+        .chat-item { padding: 12px 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: center; position: relative; }
+        .chat-item:hover { background: var(--hover-item); }
+        .chat-item.active { background: var(--active-item); border-left: 4px solid var(--primary); padding-left: 11px; } 
+        .chat-item.archived { opacity: 0.6; }
+        
+        .bulk-checkbox { display: none; width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+        .chat-list.bulk-mode .bulk-checkbox { display: block; }
+        
+        .avatar { width: 45px; height: 45px; border-radius: 50%; background: var(--avatar-bg); color: var(--avatar-color); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-size: 1.3rem; }
+        .chat-info { flex: 1; min-width: 0; }
+        .chat-name { font-weight: 600; font-size: 1rem; color: var(--text); display: flex; justify-content: space-between; }
+        .chat-preview { display: flex; justify-content: space-between; align-items: center; margin-top: 3px; }
+        .chat-last-msg { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .badge { background: var(--primary); color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; min-width: 18px; text-align: center; }
+        .mini-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+        .mini-tag { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; color: #000; font-weight: 600; }
+
+        #bulk-toolbar { display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: var(--bg-main); border-top: 2px solid var(--primary); padding: 15px; z-index: 50; flex-direction: column; gap: 10px; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); }
+        #bulk-toolbar.show { display: flex; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .bulk-actions-row { display: flex; justify-content: space-between; align-items: center; }
+
+        .chat-area { flex: 1; display: flex; flex-direction: column; background-color: var(--chat-bg-color); background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-blend-mode: multiply; opacity: 0.95; position: relative; }
+        .chat-top { padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .messages { flex: 1; overflow-y: auto; padding: 20px 40px; display: flex; flex-direction: column; gap: 4px; }
+        
+        .msg { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 0.95rem; line-height: 1.4; position: relative; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .msg.user { background: var(--incoming); align-self: flex-start; border-top-left-radius: 0; color: #FFF; }
+        .msg.bot, .msg.manual { background: var(--outgoing); align-self: flex-end; border-top-right-radius: 0; color: #FFF; }
+        
+        /* NUEVO: ESTILO PARA BURBUJAS DE CAMPAÑA */
+        .msg.campaign { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); align-self: flex-end; border-top-right-radius: 0; color: #FFF; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
+        .msg.campaign a { color: #a5b4fc; }
+        
+        .msg.alert { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #D32F2F; align-self: center; border-radius: 8px; width: 85%; max-width: 85%; text-align: center; font-weight: 500; font-size: 0.85rem; }
+        .msg-time { font-size: 0.65rem; opacity: 0.7; align-self: flex-end; margin-top: 4px; }
+        
+        .msg-forward-btn { position: absolute; top: 5px; right: -35px; background: var(--bg-main); color: var(--primary); border: 1px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.85rem; opacity: 0; visibility: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: opacity 0.3s ease 1.5s, visibility 0.3s ease 1.5s, transform 0.2s, background 0.2s; }
+        .msg:hover .msg-forward-btn { opacity: 1; visibility: visible; transition-delay: 0s; }
+        .msg.bot:hover .msg-forward-btn, .msg.campaign:hover .msg-forward-btn { left: -35px; right: auto; }
+        .msg-forward-btn:hover { background: var(--primary); color: #FFF; transform: scale(1.1); }
+
+        .audio-wrapper { display: flex; align-items: center; gap: 12px; padding: 6px; background: rgba(255,255,255,0.15); border-radius: 12px; min-width: 250px; }
+        [data-theme="dark"] .audio-wrapper { background: rgba(0,0,0,0.2); }
+        .play-btn { width: 38px; height: 38px; background: var(--primary); color: white; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .play-btn:hover { transform: scale(1.1); }
+        .audio-progress { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px; margin-top: 2px; }
+        input[type=range].wa-slider { -webkit-appearance: none; width: 100%; background: transparent; height: 6px; cursor: pointer; }
+        input[type=range].wa-slider::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; }
+        input[type=range].wa-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--primary); margin-top: -4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.1s; }
+        input[type=range].wa-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .audio-time { font-size: 0.7rem; color: #FFF; font-family: monospace; display: flex; justify-content: space-between; opacity: 0.9; padding-top: 2px; }
+        .btn-download-audio { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFF; text-decoration: none; background: rgba(255,255,255,0.1); transition: background 0.2s; }
+        .btn-download-audio:hover { background: rgba(255,255,255,0.3); }
+
+        .input-area { padding: 12px 16px; background: var(--panel); display: flex; gap: 10px; align-items: center; border-top: 1px solid var(--border); }
+        .input-box { flex: 1; padding: 12px 15px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text); outline: none; resize: none; height: 45px; font-size: 0.95rem; transition: border 0.3s; }
+        .input-box:focus { border-color: var(--primary); }
+        .send-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: #FFF; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
+        .send-btn:hover { filter: brightness(1.1); transform: scale(1.05); }
+        .attach-btn { background: transparent; border: none; color: var(--icon-color); font-size: 1.4rem; cursor: pointer; padding: 0 5px; }
+        .attach-btn:hover { color: var(--primary); transform: scale(1.1); }
+
+        .crm-panel { width: 320px; border-left: 1px solid var(--border); background: var(--panel); padding: 20px; overflow-y: auto; display: none; flex-shrink: 0; }
+        .crm-panel.open { display: block; position: absolute; right: 0; height: 100%; z-index: 30; border-left: 1px solid var(--border); background: var(--bg-main); box-shadow: -5px 0 15px rgba(0,0,0,0.1); }
+        .crm-section { margin-bottom: 30px; background: var(--bg-main); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .crm-title { font-size: 0.75rem; text-transform: uppercase; color: var(--primary); margin-bottom: 12px; font-weight: 700; letter-spacing: 0.5px; }
+        .crm-input { width: 100%; padding: 10px; margin-bottom: 10px; background: var(--bg-main); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 0.9rem; transition: border 0.3s; }
+        .crm-input:focus { border-color: var(--primary); outline: none; }
+        
+        select.crm-input { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23515050%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 10px top 50%; background-size: 10px auto; }
+        
+        .tag-container { display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag { padding: 4px 10px; border-radius: 99px; font-size: 0.8rem; cursor: pointer; border: 1px solid var(--border); color: var(--text-muted); background: var(--bg-main); transition: 0.2s; font-weight: 500; }
+        .tag:hover { transform: scale(1.05); }
+        .tag.selected { border-color: var(--primary); background: var(--primary); color: #fff; }
+        
+        .switch-container { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        .leads-container, .config-container { padding: 30px; width: 100%; box-sizing: border-box; background: var(--bg-main); }
+        .table-responsive { width: 100%; overflow-x: auto; margin-top: 20px; background: var(--bg-main); border-radius: 8px; border: 1px solid var(--border); }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1000px; }
+        .data-table th, .data-table td { padding: 14px 15px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .data-table th { color: var(--text-muted); font-weight: 600; background: var(--panel); }
+        .data-table tr:hover { background: var(--hover-item); }
+        .lead-source-tag { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .lead-source-web { background: rgba(30, 64, 175, 0.1); color: #3b82f6; border: 1px solid #1e40af; }
+        .lead-source-store { background: rgba(134, 25, 143, 0.1); color: #d946ef; border: 1px solid #a21caf; }
+
+        .config-tabs-nav { display: flex; gap: 15px; margin-bottom: 25px; border-bottom: 2px solid var(--border); padding-bottom: 15px; overflow-x: auto; }
+        .btn-tab { background: transparent; border: none; font-size: 0.95rem; font-weight: 600; color: var(--text-muted); padding: 10px 18px; cursor: pointer; transition: all 0.2s; border-radius: 8px; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+        .btn-tab:hover { background: var(--hover-item); color: var(--primary); }
+        .btn-tab.active { background: var(--primary); color: #fff; box-shadow: 0 4px 10px rgba(233, 82, 30, 0.2); }
+        .config-sub-panel { display: none; animation: fadeIn 0.3s; }
+        .config-sub-panel.active { display: block; }
+        .config-header-main { font-size: 1.3rem; font-weight: 600; padding-bottom: 10px; margin-bottom: 15px; color: var(--text); display: flex; align-items: center; gap: 10px; }
+        .config-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+        .config-card { background: var(--bg-main); padding: 25px; border-radius: 12px; border: 1px solid var(--border); flex: 1; min-width: 300px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .config-header { font-size: 1.05rem; font-weight: 600; margin-bottom: 5px; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        .config-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px; display: block; }
+        .prompt-textarea { width: 100%; background: var(--bg-main); color: var(--text); padding: 15px; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 0.95rem; border: 1px solid var(--border); resize: vertical; line-height: 1.5; outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+        .prompt-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(233, 82, 30, 0.1); }
+        .config-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; background: var(--bg-main); border-bottom: 1px solid var(--border); font-size: 0.9rem; transition: background 0.2s; border-radius: 6px;}
+        .config-item:hover { background: var(--panel); }
+        .config-input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .cfg-input { flex:1; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text); outline: none; font-size: 0.9rem;}
+        .cfg-input:focus { border-color: var(--primary); }
+        
+        .btn-small { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-green { background: var(--primary); color: #fff; }
+        .btn-green:hover { filter: brightness(1.1); box-shadow: 0 3px 6px rgba(233, 82, 30, 0.2); }
+        .btn-red { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
+        .btn-red:hover { background: #ef4444; color: #FFF; }
+        .btn-blue { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-blue:hover { background: var(--panel); color: var(--primary); border-color: var(--primary); }
+
+        #context-menu { position: absolute; display: none; background: var(--bg-main); border: 1px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.2); border-radius: 8px; width: 180px; z-index: 1000; overflow: hidden; }
+        .ctx-item { padding: 12px 15px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; color: var(--text); transition: background 0.2s; font-weight: 500; }
+        .ctx-item:hover { background: var(--panel); color: var(--primary); }
+        .ctx-divider { height: 1px; background: var(--border); margin: 0; }
+        
+        #toast { visibility: hidden; min-width: 250px; margin-left: -125px; background-color: var(--primary); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 2000; left: 50%; bottom: 30px; font-size: 15px; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        .lightbox-content-container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; transition: 0.2s; z-index: 5001;}
+        .lightbox-close:hover { color: var(--primary); transform: scale(1.1); }
+        
+        @media (max-width: 768px) {
+            .sidebar { display: none; } 
+            .chat-list { width: 100%; height: 100dvh; position: absolute; top: 0; left: 0; z-index: 10; }
+            .chat-area { position: absolute; width: 100%; height: 100dvh; top: 0; left: 0; z-index: 20; transform: translateX(100%); transition: transform 0.3s ease; background-color: var(--chat-bg-color); }
+            body.mobile-chat-open .chat-area { transform: translateX(0); }
+            #back-btn { display: flex !important; margin-right: 15px; font-size: 1.2rem; cursor: pointer; color: var(--icon-color); align-items: center; justify-content: center; width: 30px; height: 30px;}
+        }
+        #back-btn { display: none; }
+    </style>
+</head>
+<body data-theme="light">
+
+    <div class="sidebar">
+        <div style="width: 40px; height: 40px; background: url('https://raw.githubusercontent.com/juanballen2/CHATBOT/main/images/iconboticc_Mesa%20de%20trabajo%201.svg') no-repeat center/contain; border-radius: 50%; margin-bottom: 30px;" id="logo-preview"></div>
+        <button class="nav-btn active" onclick="switchTab('chat')" title="Chats"><i class="fas fa-comments"></i></button>
+        <button class="nav-btn" onclick="switchTab('leads')" title="Base de Leads"><i class="fas fa-database"></i></button>
+        <button class="nav-btn" onclick="switchTab('config')" title="Configuración"><i class="fas fa-sliders-h"></i></button>
+        <div class="nav-bottom">
+            <button class="nav-btn" onclick="toggleTheme()" title="Cambiar Tema"><i class="fas fa-moon" id="theme-icon"></i></button>
+            <button class="nav-btn" onclick="location.href='/logout'" title="Salir"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+    </div>
+
+    <div class="main-area">
+        
+        <div id="tab-chat" class="view-panel active">
+            <div class="chat-list" id="chat-list-panel">
+                <div class="chat-header">
+                    <div class="search-container">
+                        <input type="text" class="search-bar" id="main-search" placeholder="🔍 Buscar chat o número..." onkeyup="debounceSearch(this.value)">
+                        <button class="action-btn" id="bulk-toggle-btn" onclick="toggleBulkMode()" title="Selección Múltiple"><i class="fas fa-check-double"></i></button>
+                        <button class="action-btn new-chat-btn" onclick="startNewChat()" title="Nuevo Chat"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="view-filters">
+                        <span class="filter-chip active" onclick="setChatFilter('active', this)">Activos</span>
+                        <span class="filter-chip" onclick="setChatFilter('unread', this)">No leídos</span>
+                        <span class="filter-chip" onclick="setChatFilter('archived', this)">Archivados</span>
+                        <select id="tag-filter" class="tag-filter-select" onchange="syncChats()">
+                            <option value="">Todas las etiquetas</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chat-items" id="chat-list-container"></div>
+                
+                <div id="bulk-toolbar">
+                    <div style="color:var(--text); font-size:0.9rem; font-weight:bold;">
+                        <span id="bulk-count">0</span> seleccionados
+                    </div>
+                    <div class="bulk-actions-row">
+                        <select id="bulk-tag-select" class="tag-filter-select" style="flex:1; margin-right: 10px;">
+                            <option value="">Etiquetar como...</option>
+                        </select>
+                        <button class="btn-small btn-green" onclick="executeBulkAction('set_label')" style="margin-right: 10px;">Aplicar</button>
+                        
+                        <button class="btn-small btn-green" onclick="openTemplateModal(true)" style="margin-right: 10px; background: #4f46e5; border-color: #4f46e5;" title="Envío Masivo de Plantillas">
+                            <i class="fas fa-bullhorn"></i> Masivo
+                        </button>
+                        
+                        <button class="btn-small btn-blue" onclick="executeBulkAction('toggle_archive')" title="Archivar/Desarchivar"><i class="fas fa-archive"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-area" id="conversation-view" style="display:none;">
+                <div class="chat-top">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div id="back-btn" onclick="closeChat()"><i class="fas fa-arrow-left"></i></div>
+                        <div id="chat-header-avatar" class="avatar"><i class="fas fa-user"></i></div>
+                        <div>
+                            <div id="chat-header-name" style="font-weight:700; font-size:1.05rem; color:var(--text);">Selecciona un chat</div>
+                            <div id="chat-header-phone" style="font-size:0.8rem; color:var(--text-muted); margin-top: 2px;"></div>
+                        </div>
+                    </div>
+                    <button class="nav-btn" onclick="toggleCRM()"><i class="fas fa-columns"></i></button>
+                </div>
+                
+                <div class="messages" id="messages-container"></div>
+                
+                <div class="input-area">
+                    <button class="attach-btn" onclick="openTemplateModal(false)" title="Enviar Plantilla (Marketing/Retoma)"><i class="fas fa-bullhorn"></i></button>
+                    <button class="attach-btn" onclick="document.getElementById('file-upload').click()"><i class="fas fa-paperclip"></i></button>
+                    <input type="file" id="file-upload" hidden onchange="uploadFile()" accept="image/*,video/*,audio/*,application/pdf">
+                    <textarea class="input-box" id="msg-input" placeholder="Escribe un mensaje aquí..." onkeypress="checkEnter(event)"></textarea>
+                    <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+            
+            <div class="crm-panel" id="crm-panel">
+                <div style="text-align:right;"><button class="btn-small btn-red" onclick="toggleCRM()"><i class="fas fa-times"></i></button></div>
+                <div class="crm-section">
+                    <div class="crm-title"><i class="fas fa-robot"></i> Control IA</div>
+                    <div class="switch-container">
+                        <span class="switch-label">ICBOT Responde</span>
+                        <label class="switch">
+                            <input type="checkbox" id="bot-switch" onchange="toggleBotActive()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="crm-section">
+                    <div class="crm-title"><i class="fas fa-user-edit"></i> Datos del Contacto</div>
+                    <input id="crm-name" class="crm-input" placeholder="Nombre Completo">
+                    <input id="crm-phone" class="crm-input" placeholder="Teléfono" readonly title="No editable. Se copia para el Ejecutivo." style="background:var(--panel); cursor:text; font-family: monospace; font-size: 1rem;">
+                    
+                    <input id="crm-email" class="crm-input" type="email" placeholder="Correo Electrónico">
+                    <input id="crm-city" class="crm-input" placeholder="Ciudad">
+                    <input id="crm-dept" class="crm-input" placeholder="Departamento" readonly title="Automático" style="background:var(--panel); cursor:not-allowed;">
+                    
+                    <div class="crm-title" style="margin-top:20px;"><i class="fas fa-bullseye"></i> Perfilamiento</div>
+                    <select id="crm-interest" class="crm-input">
+                        <option value="">Selecciona Interés...</option>
+                        <option value="Maquinaria nueva">Maquinaria nueva</option>
+                        <option value="Maquinaria usada">Maquinaria usada</option>
+                        <option value="Volquetas">Volquetas</option>
+                        <option value="Martillos Hidráulicos">Martillos Hidráulicos</option>
+                        <option value="Brazos largos">Brazos largos</option>
+                        <option value="Accesorios">Accesorios</option>
+                        <option value="Repuestos">Repuestos</option>
+                        <option value="Servicio">Servicio</option>
+                        <option value="Otro">Otro</option>
+                        <option value="Consultando">Consultando</option>
+                    </select>
+                    <input id="crm-specific-interest" class="crm-input" placeholder="Detalle (Ej: Volvo 50 tons, Retro John Deere...)">
+
+                    <div class="crm-title" style="margin-top:20px;"><i class="fas fa-user-tie"></i> Ejecutivo Asignado</div>
+                    <select id="crm-executive" class="crm-input">
+                        <option value="Pendiente">Pendiente (Sin Asignar)</option>
+                        <option value="005Dn000007mWFhIAM">Luz</option>
+                        <option value="005UO000000PdB3YAK">Felipe</option>
+                        <option value="005Dn000005u1yTIAQ">Mario</option>
+                        <option value="005Dn000005u27NIAQ">Marcos</option>
+                        <option value="005Dn000005u22vIAA">Fabio</option>
+                        <option value="005Dn000005u2BkIAI">Diana</option>
+                        <option value="005Dn000007H1EUIA0">Marketing</option>
+                        <option value="005Dn000003Z5vbIAC">Oscar</option>
+                    </select>
+
+                    <button class="btn-small btn-green" style="width:100%; margin-top:15px;" onclick="saveLeadManual()"><i class="fas fa-save"></i> Guardar Cambios</button>
+                </div>
+
+                <div class="crm-section"><div class="crm-title"><i class="fas fa-tags"></i> Etiqueta Comercial</div><div class="tag-container" id="tag-list"></div></div>
+                <div class="crm-section"><div class="crm-title"><i class="fas fa-bolt"></i> Respuestas Rápidas</div><div class="tag-container" id="shortcuts-list"></div></div>
+            </div>
+        </div>
+
+        <div id="tab-leads" class="view-panel">
+            <div class="leads-container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2><i class="fas fa-users" style="color:var(--primary);"></i> Base de Leads</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-small btn-green" onclick="openExcelModal()" style="background: #8b5cf6; border-color: #8b5cf6;"><i class="fas fa-rocket"></i> Campaña Excel</button>
+                        
+                        <button class="btn-small btn-green" onclick="downloadExcel()"><i class="fas fa-file-excel"></i> Descargar CSV</button>
+                        <button class="btn-small btn-blue" onclick="refreshLeads()"><i class="fas fa-sync"></i> Actualizar</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAllLeads" onclick="toggleAllLeads(this)" style="cursor:pointer; width:16px; height:16px;"></th>
+                                <th>Fecha</th>
+                                <th>Fuente</th>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th>Ciudad</th>
+                                <th>Departamento</th>
+                                <th>Correo</th>
+                                <th>Categoría Interés</th>
+                                <th>Producto/Detalle</th>
+                                <th>Ejecutivo</th>
+                                <th>Etiquetas Visuales</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-config" class="view-panel">
+            <div class="config-container">
+                
+                <div class="config-tabs-nav">
+                    <button class="btn-tab active" onclick="switchConfigTab('sub-identidad', this)"><i class="fas fa-brain"></i> Identidad y Reglas</button>
+                    <button class="btn-tab" onclick="switchConfigTab('sub-memoria', this)"><i class="fas fa-database"></i> Memoria y Catálogo</button>
+                    <button class="btn-tab" onclick="switchConfigTab('sub-herramientas', this)"><i class="fas fa-tools"></i> Herramientas Comerciales</button>
+                </div>
+
+                <div id="sub-identidad" class="config-sub-panel active">
+                    <div class="config-header-main"><i class="fas fa-id-badge" style="color:var(--primary);"></i> Identidad del Bot</div>
+                    <div class="config-row">
+                        <div class="config-card" style="flex: 2;">
+                            <div class="config-header">
+                                <span>Personalidad Activa</span>
+                                <button class="btn-small btn-blue" onclick="openPromptEdit()"><i class="fas fa-pencil-alt"></i> Editar</button>
+                            </div>
+                            <span class="config-subtitle">Así es como se está comportando el bot en este momento:</span>
+                            <div id="prompt-readonly" style="background: var(--panel); padding: 15px; border-radius: 8px; font-size: 0.95rem; color: var(--text); border: 1px solid var(--border); min-height: 120px; white-space: pre-wrap; font-style: italic;">
+                                Cargando personalidad...
+                            </div>
+                        </div>
+                        
+                        <div class="config-card" style="flex: 1;">
+                            <div class="config-header">Reglas Estrictas</div>
+                            <span class="config-subtitle">Instrucciones que el bot nunca debe romper.</span>
+                            <div class="config-input-group">
+                                <input type="text" id="rule-input" class="cfg-input" placeholder="Ej: Nunca dar descuentos iniciales...">
+                                <button class="btn-small btn-green" onclick="addRule()"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <ul class="item-list" id="rules-list" style="margin-top: 15px; max-height: 250px; overflow-y: auto;"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sub-memoria" class="config-sub-panel">
+                    <div class="config-header-main"><i class="fas fa-book-open" style="color:var(--primary);"></i> Memoria y Datos</div>
+                    <div class="config-row">
+                        <div class="config-card" style="flex: 2;">
+                            <div class="config-header">
+                                <span>Inventario y Catálogo (Excel/CSV)</span>
+                                <span id="inventory-count" style="font-size:0.85rem; color:var(--text); background:var(--panel); padding:4px 10px; border-radius:12px; border: 1px solid var(--border);">0 items</span>
+                            </div>
+                            <span class="config-subtitle">Sube tu base de datos de productos para que la IA sepa precios y disponibilidad en tiempo real.</span>
+                            
+                            <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background: var(--panel); padding: 10px; border-radius: 8px;">
+                                <input type="file" id="csv-upload" accept=".csv, .xlsx, .xls" style="flex:1; font-size:0.85rem;">
+                                <button class="btn-small btn-green" onclick="uploadCSV()"><i class="fas fa-upload"></i> Cargar Archivo</button>
+                                <button class="btn-small btn-blue" onclick="loadInventoryPreview()" title="Refrescar vista"><i class="fas fa-sync"></i></button>
+                                <button class="btn-small btn-red" onclick="clearInventory()" title="Borrar todo el inventario"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                            <ul class="item-list" id="inventory-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--bg-main);">
+                                <li style="text-align:center; color:var(--text-muted); font-size:0.9rem;">Cargando inventario...</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="config-card" style="flex: 1;">
+                            <div class="config-header">Lectura de Páginas Web</div>
+                            <span class="config-subtitle">Añade un enlace para que el bot memorice su información.</span>
+                            <div class="config-input-group">
+                                <input type="text" id="web-url-input" class="cfg-input" placeholder="https://tuempresa.com/volquetas">
+                                <button class="btn-small btn-green" onclick="scanWeb()"><i class="fas fa-plus"></i> Añadir</button>
+                            </div>
+                            <ul class="item-list" id="web-knowledge-list" style="margin-top: 15px; max-height: 250px; overflow-y: auto;"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sub-herramientas" class="config-sub-panel">
+                    <div class="config-header-main"><i class="fas fa-briefcase" style="color:var(--primary);"></i> Herramientas Operativas</div>
+                    
+                    <div class="config-row">
+                        <div class="config-card" style="flex: 1;">
+                            <div class="config-header">Perfil de Empresa</div>
+                            <span class="config-subtitle">Información básica del negocio.</span>
+                            <div style="display:flex; gap:10px; flex-direction: column;">
+                                <input id="biz-name" class="cfg-input" placeholder="Nombre Oficial de la Empresa">
+                                <input id="biz-hours" class="cfg-input" placeholder="Horario de atención (Ej: Lun-Vie 8am a 6pm)">
+                                <button class="btn-small btn-green" onclick="saveBizConfig()"><i class="fas fa-save"></i> Guardar Perfil</button>
+                            </div>
+                            <div style="margin-top:20px; font-size:0.9rem; font-weight:600; padding-top: 15px; border-top: 1px solid var(--border);">
+                                Actualizar Logo del Sistema: 
+                                <input type="file" onchange="uploadLogo(this)" style="margin-top: 10px; display: block; font-weight:normal;">
+                            </div>
+                        </div>
+
+                        <div class="config-card" style="flex: 1;">
+                            <div class="config-header">Etiquetas Visuales</div>
+                            <span class="config-subtitle">Crea etiquetas de colores para organizar a los leads en el CRM.</span>
+                            <div class="config-input-group">
+                                <input type="text" id="tag-name" class="cfg-input" placeholder="Nombre (Ej: VIP, Seguimiento)">
+                                <input type="color" id="tag-color" value="#E9521E" style="width:45px; height:40px; padding:2px; border:1px solid var(--border); border-radius:6px; cursor:pointer;">
+                                <button class="btn-small btn-green" onclick="addTag()"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <ul class="item-list" id="config-tags-list" style="margin-top: 15px; max-height: 200px; overflow-y: auto;"></ul>
+                        </div>
+                        
+                        <div class="config-card" style="flex: 1;">
+                            <div class="config-header">Respuestas Rápidas (Atajos)</div>
+                            <span class="config-subtitle">Textos largos que puedes enviar usando un comando corto.</span>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="config-input-group">
+                                    <input type="text" id="short-key" class="cfg-input" placeholder="/hola" style="width:30%;">
+                                    <input type="text" id="short-text" class="cfg-input" placeholder="Texto extenso de saludo...">
+                                </div>
+                                <button class="btn-small btn-green" onclick="addShortcut()"><i class="fas fa-plus"></i> Crear Atajo</button>
+                            </div>
+                            <ul class="item-list" id="config-shortcuts-list" style="margin-top: 15px; max-height: 200px; overflow-y: auto;"></ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="template-modal" class="modal-overlay" onclick="closeModal('template-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title" id="tpl-modal-title"><i class="fas fa-bullhorn" style="color:var(--primary);"></i> Enviar Plantilla</div>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-5px; margin-bottom:10px;" id="tpl-modal-desc">Dispara una plantilla pre-aprobada por Meta.</p>
+            
+            <input type="hidden" id="tpl-is-bulk" value="false">
+            
+            <div class="modal-form">
+                <label>Nombre de la Plantilla en Meta</label>
+                <input list="template-names" id="tpl-name" placeholder="Ej: plantilla_de_retoma" required>
+                <datalist id="template-names">
+                    <option value="plantilla_de_retoma"></option>
+                    <option value="tu_plantilla_promo"></option>
+                </datalist>
+
+                <label>Imagen de Encabezado (Opcional)</label>
+                <input type="file" id="tpl-file" accept="image/jpeg, image/png">
+
+                <label>Variables de Texto (Opcional)</label>
+                <input type="text" id="tpl-vars" placeholder="Ej: Carlos, 15% Descuento (Separar por comas)">
+                <span style="font-size:0.75rem; color:var(--text-muted);">Aplica solo si el cuerpo del mensaje tiene {{1}}, {{2}}</span>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('template-modal')">Cancelar</button>
+                <button class="btn-small btn-green" onclick="processTemplateSubmit()" id="btn-tpl-send"><i class="fas fa-paper-plane"></i> Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="excel-modal" class="modal-overlay" onclick="closeModal('excel-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title"><i class="fas fa-rocket" style="color:#8b5cf6;"></i> Campaña Masiva desde Excel</div>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-5px; margin-bottom:10px;">El archivo debe tener una columna <strong>Telefono</strong> (o Celular) y opcionalmente <strong>Nombre</strong>.</p>
+            
+            <div class="modal-form">
+                <label>Nombre de la Plantilla en Meta</label>
+                <input list="template-names" id="excel-tpl-name" placeholder="Ej: promo_repuestos" required>
+
+                <label>Archivo de Contactos (.xlsx, .csv)</label>
+                <input type="file" id="excel-file" accept=".xlsx, .csv" required>
+
+                <label>Imagen de Campaña (Opcional)</label>
+                <input type="file" id="excel-img" accept="image/jpeg, image/png">
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('excel-modal')">Cancelar</button>
+                <button class="btn-small btn-green" onclick="sendExcelCampaign()" id="btn-excel-send" style="background:#8b5cf6; border-color:#8b5cf6;"><i class="fas fa-paper-plane"></i> Disparar Campaña</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="prompt-edit-modal" class="modal-overlay" onclick="closeModal('prompt-edit-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px;">
+            <div class="modal-title"><i class="fas fa-brain" style="color:var(--primary);"></i> Editar Personalidad</div>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-5px; margin-bottom:10px;">Define el tono, comportamiento y objetivo del bot.</p>
+            <textarea id="prompt-editor" class="prompt-textarea" style="height: 250px;"></textarea>
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('prompt-edit-modal')">Cancelar</button>
+                <button class="btn-small btn-green" onclick="savePrompt(event)"><i class="fas fa-save"></i> Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="web-audit-modal" class="modal-overlay" onclick="closeModal('web-audit-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px;">
+            <div class="modal-title"><i class="fas fa-globe" style="color:var(--primary);"></i> Información Aprendida</div>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-5px; margin-bottom:10px;">Esto es lo que el bot memorizó. Puedes editarlo para mejorarlo:</p>
+            <input type="hidden" id="edit-web-id">
+            <textarea id="web-audit-text" class="prompt-textarea" style="height: 200px; font-size: 0.9rem;"></textarea>
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('web-audit-modal')">Cancelar</button>
+                <button class="btn-small btn-green" onclick="saveWebEdit(event)"><i class="fas fa-save"></i> Guardar Corrección</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title"><i class="fas fa-box-open" style="color:var(--primary);"></i> Editar Producto</div>
+            <div class="modal-form">
+                <input type="hidden" id="edit-id">
+                <label>Nombre del Producto</label>
+                <input type="text" id="edit-nombre">
+                <label>Precio</label>
+                <input type="text" id="edit-precio">
+                <label>Stock</label>
+                <input type="text" id="edit-stock">
+                <label>Descripción</label>
+                <textarea id="edit-desc" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('edit-modal')">Cancelar</button>
+                <button class="btn-small btn-green" onclick="saveEditInventory()"><i class="fas fa-check"></i> Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tag-edit-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width:350px;">
+            <div class="modal-title"><i class="fas fa-tag" style="color:var(--primary);"></i> Editar Etiqueta</div>
+            <div class="modal-form">
+                <input type="hidden" id="edit-tag-id">
+                <label>Nombre</label>
+                <input type="text" id="edit-tag-name">
+                <label>Color</label>
+                <input type="color" id="edit-tag-color" style="height:45px; cursor:pointer;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('tag-edit-modal')">Cancelar</button>
+                <button class="btn-small btn-green" onclick="saveTagEdit()"><i class="fas fa-check"></i> Actualizar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="forward-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title"><i class="fas fa-share" style="color:var(--primary);"></i> Reenviar Mensaje</div>
+            <div class="modal-form">
+                <p id="forward-preview" style="font-size:0.9rem; color:var(--text); font-style:italic; margin-bottom:15px; border-left:3px solid var(--primary); padding-left:10px; background:var(--panel); padding: 10px; border-radius: 4px;"></p>
+                <label>Buscar Chat Destino</label>
+                <input type="text" id="forward-search" placeholder="Escribe el nombre del cliente..." onkeyup="filterForwardList()">
+                <div id="forward-list" style="max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:var(--bg-main);"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-small btn-red" onclick="closeModal('forward-modal')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lead-details-modal" class="modal-overlay" onclick="closeModal('lead-details-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px;">
+            <div class="modal-title"><i class="fas fa-address-card" style="color:var(--primary);"></i> Detalles Completos del Lead</div>
+            <div id="lead-details-content" style="font-size: 0.95rem; max-height: 450px; overflow-y: auto; background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px; padding: 10px;"></div>
+            <div class="modal-actions">
+                <button class="btn-small btn-green" onclick="closeModal('lead-details-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lightbox-modal" class="modal-overlay" onclick="closeLightbox(event)">
+        <span class="lightbox-close" onclick="closeLightbox(event)">&times;</span>
+        <div class="lightbox-content-container">
+            <img id="lightbox-img" style="display:none; max-width:90%; max-height:90%; border-radius:8px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
+            <video id="lightbox-video" controls style="display:none; max-width:90%; max-height:90%; border-radius:8px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); outline:none; background: #000;"></video>
+        </div>
+    </div>
+
+    <div id="context-menu">
+        <div class="ctx-item" id="ctx-pin" onclick="togglePinContext()"><i class="fas fa-thumbtack"></i> <span>Fijar Chat</span></div>
+        <div class="ctx-item" onclick="quickLabel()"><i class="fas fa-tag"></i> Etiquetar</div>
+        <div class="ctx-item" id="ctx-archive" onclick="contextAction('toggle_archive')"><i class="fas fa-archive"></i> <span>Archivar</span></div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item" onclick="contextAction('delete')" style="color:#ef4444;"><i class="fas fa-trash"></i> Eliminar Chat</div>
+    </div>
+
+    <div id="toast">Notificación</div>
+
+    <script>
+        const socket = io();
+
+        let currentChat = null;
+        let currentFilter = 'active';
+        let chatsData = [];
+        let contextPhone = null;
+        let searchTimeout = null;
+        let currentlyPlaying = null;
+        let currentInventory = []; 
+        let bulkMode = false;
+        let selectedChats = new Set();
+        let msgToForward = null;
+        
+        window._cachedTags = []; 
+
+        const executivesMap = {
+            "005Dn000007mWFhIAM": "Luz",
+            "005UO000000PdB3YAK": "Felipe",
+            "005Dn000005u1yTIAQ": "Mario",
+            "005Dn000005u27NIAQ": "Marcos",
+            "005Dn000005u22vIAA": "Fabio",
+            "005Dn000005u2BkIAI": "Diana",
+            "005Dn000007H1EUIA0": "Marketing",
+            "005Dn000003Z5vbIAC": "Oscar",
+            "Pendiente": "Pendiente (Sin Asignar)"
+        };
+
+        window.onload = function() { 
+            startSyncLoop(); 
+            refreshLeads(); 
+            loadAllConfig(); 
+            loadTagFilterOptions(); 
+            
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+
+            document.addEventListener('click', (e) => { 
+                if(!e.target.closest('.chat-item')) {
+                    document.getElementById('context-menu').style.display = 'none'; 
+                }
+            }); 
+        };
+
+        socket.on('update_chats_list', () => { 
+            syncChats(); 
+        });
+
+        socket.on('new_message', (msg) => {
+            if (currentChat === msg.phone) {
+                const container = document.getElementById('messages-container');
+                const isScrolledToBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 50;
+                
+                container.insertAdjacentHTML('beforeend', buildMessageHTML(msg));
+                
+                if(isScrolledToBottom || msg.role === 'bot' || msg.role === 'manual') {
+                    setTimeout(() => { 
+                        container.scrollTop = container.scrollHeight; 
+                    }, 50);
+                }
+            }
+        });
+
+        function switchConfigTab(tabId, btnElement) {
+            document.querySelectorAll('.config-sub-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            document.querySelectorAll('.btn-tab').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            if(theme === 'dark') { 
+                icon.classList.remove('fa-moon'); 
+                icon.classList.add('fa-sun'); 
+            } else { 
+                icon.classList.remove('fa-sun'); 
+                icon.classList.add('fa-moon'); 
+            }
+        }
+
+        function showToast(msg) { 
+            const x = document.getElementById("toast"); 
+            x.innerText = msg; 
+            x.className = "show"; 
+            setTimeout(function(){ 
+                x.className = x.className.replace("show", ""); 
+            }, 3000); 
+        }
+
+        function closeModal(id) { 
+            document.getElementById(id).classList.remove('show'); 
+        }
+        
+        function updateTagsOptimistic(phone, tagObj, remove = false) {
+            const chat = chatsData.find(c => c.id === phone);
+            if (chat) {
+                if (!chat.labels) chat.labels = [];
+                if (remove) {
+                    chat.labels = chat.labels.filter(l => l.text !== tagObj.text);
+                } else {
+                    if (!chat.labels.find(l => l.text === tagObj.text)) {
+                        chat.labels.push(tagObj);
+                    }
+                }
+                renderChatList();
+            }
+        }
+
+        // --- SISTEMA DE PLANTILLAS Y MASIVOS ---
+        function openTemplateModal(isBulk = false) {
+            if(!isBulk && !currentChat) return showToast("Abre un chat para envío individual.");
+            if(isBulk && selectedChats.size === 0) return showToast("Selecciona al menos un chat para envío masivo.");
+            
+            document.getElementById('tpl-name').value = "";
+            document.getElementById('tpl-file').value = "";
+            document.getElementById('tpl-vars').value = "";
+            document.getElementById('tpl-is-bulk').value = isBulk ? "true" : "false";
+            
+            const title = document.getElementById('tpl-modal-title');
+            const desc = document.getElementById('tpl-modal-desc');
+            const btn = document.getElementById('btn-tpl-send');
+            
+            if (isBulk) {
+                title.innerHTML = `<i class="fas fa-bullhorn" style="color:var(--primary);"></i> Envío Masivo (${selectedChats.size} chats)`;
+                desc.innerText = "Dispara una plantilla a todos los contactos seleccionados de forma escalonada.";
+                btn.innerHTML = '<i class="fas fa-rocket"></i> Iniciar Envío Masivo';
+            } else {
+                title.innerHTML = `<i class="fas fa-bullhorn" style="color:var(--primary);"></i> Enviar Plantilla`;
+                desc.innerText = "Dispara una plantilla pre-aprobada por Meta.";
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+            }
+
+            document.getElementById('template-modal').classList.add('show');
+        }
+
+        async function processTemplateSubmit() {
+            const name = document.getElementById('tpl-name').value.trim();
+            const fileInput = document.getElementById('tpl-file');
+            const varsInput = document.getElementById('tpl-vars').value.trim();
+            const isBulk = document.getElementById('tpl-is-bulk').value === "true";
+            
+            if(!name) return showToast("⚠️ El nombre de la plantilla es obligatorio.");
+
+            let components = [];
+            
+            if (varsInput) {
+                const varsArr = varsInput.split(',').map(v => v.trim());
+                const parameters = varsArr.map(v => ({ type: "text", text: v }));
+                components.push({ type: "body", parameters: parameters });
+            }
+
+            let previewText = `[CAMPAÑA]\n📢 Plantilla: ${name}`;
+            if (varsInput) previewText += `\n📝 Variables: ${varsInput}`;
+            if (fileInput.files.length > 0) previewText += `\n🖼️ [Imagen Adjunta]`;
+
+            const formData = new FormData();
+            formData.append('templateName', name);
+            formData.append('language', 'es_CO');
+            formData.append('previewText', previewText);
+            
+            if (components.length > 0) formData.append('components', JSON.stringify(components));
+            if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+            closeModal('template-modal');
+
+            if (isBulk) {
+                await executeBulkTemplates(formData);
+            } else {
+                formData.append('phone', currentChat);
+                await executeSingleTemplate(formData);
+            }
+        }
+
+        async function executeSingleTemplate(formData) {
+            showToast("Enviando plantilla e imagen a Meta... ⏳");
+            try {
+                const res = await fetch('/api/chat/send-template', {
+                    method: 'POST',
+                    body: formData 
+                });
+                const data = await res.json();
+                if(data.success) showToast("✅ Plantilla enviada con éxito");
+                else showToast("❌ Error Meta: " + (data.error || "Desconocido"));
+            } catch(e) {
+                showToast("❌ Fallo de red al conectar con el servidor.");
+            }
+        }
+
+        async function executeBulkTemplates(baseFormData) {
+            const phones = Array.from(selectedChats);
+            showToast(`🚀 Iniciando envío masivo a ${phones.length} contactos...`);
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < phones.length; i++) {
+                const phone = phones[i];
+                baseFormData.set('phone', phone);
+                
+                try {
+                    const res = await fetch('/api/chat/send-template', {
+                        method: 'POST',
+                        body: baseFormData
+                    });
+                    if (res.ok) successCount++;
+                    else errorCount++;
+                } catch(e) {
+                    errorCount++;
+                }
+                
+                await new Promise(r => setTimeout(r, 250));
+            }
+            
+            alert(`Resumen de Campaña Masiva:\n\n✅ Enviados: ${successCount}\n❌ Errores: ${errorCount}`);
+            toggleBulkMode();
+        }
+
+        // --- CAMPAÑA EXCEL ---
+        function openExcelModal() {
+            document.getElementById('excel-tpl-name').value = '';
+            document.getElementById('excel-file').value = '';
+            document.getElementById('excel-img').value = '';
+            document.getElementById('excel-modal').classList.add('show');
+        }
+
+        async function sendExcelCampaign() {
+            const tplName = document.getElementById('excel-tpl-name').value.trim();
+            const excelFile = document.getElementById('excel-file').files[0];
+            const imgFile = document.getElementById('excel-img').files[0];
+
+            if (!tplName || !excelFile) return showToast("⚠️ Nombre de plantilla y archivo Excel son obligatorios.");
+
+            const btn = document.getElementById('btn-excel-send');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+            btn.disabled = true;
+
+            const fd = new FormData();
+            fd.append('templateName', tplName);
+            fd.append('language', 'es_CO');
+            fd.append('excel', excelFile);
+            if (imgFile) fd.append('image', imgFile);
+
+            try {
+                const res = await fetch('/api/chat/bulk-excel', {
+                    method: 'POST',
+                    body: fd
+                });
+                const data = await res.json();
+                
+                closeModal('excel-modal');
+                if (data.success) {
+                    alert(`✅ Campaña Finalizada\n\nEnviados con éxito: ${data.sent}\nFallidos/Omitidos: ${data.failed}`);
+                    refreshLeads();
+                } else {
+                    alert("❌ Error: " + (data.error || "Error procesando campaña"));
+                }
+            } catch(e) {
+                alert("❌ Fallo de red al conectar con el servidor.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        function openLightbox(url, type) {
+            const modal = document.getElementById('lightbox-modal');
+            const img = document.getElementById('lightbox-img');
+            const vid = document.getElementById('lightbox-video');
+            
+            modal.classList.add('show');
+            
+            if (type === 'IMAGE') {
+                img.src = url; 
+                img.style.display = 'block'; 
+                vid.style.display = 'none'; 
+                vid.pause();
+            } else if (type === 'VIDEO') {
+                vid.src = url; 
+                vid.style.display = 'block'; 
+                img.style.display = 'none'; 
+                vid.play();
+            }
+        }
+
+        function closeLightbox(e) {
+            if(e.target.id === 'lightbox-modal' || e.target.classList.contains('lightbox-close')) {
+                document.getElementById('lightbox-modal').classList.remove('show');
+                document.getElementById('lightbox-video').pause();
+            }
+        }
+
+        function viewLeadDetails(phone) {
+            fetch('/api/data/leads')
+            .then(r => r.json())
+            .then(leads => {
+                const lead = leads.find(l => l.phone === phone);
+                if(lead) {
+                    let html = '<table class="data-table" style="width:100%;">';
+                    for(let key in lead) {
+                        html += `<tr><td style="font-weight:600; text-transform:capitalize; width: 35%; border-right: 1px solid var(--border);">${key}</td><td style="white-space:normal; padding-left:15px;">${lead[key] || '-'}</td></tr>`;
+                    }
+                    html += '</table>';
+                    document.getElementById('lead-details-content').innerHTML = html;
+                    document.getElementById('lead-details-modal').classList.add('show');
+                }
+            })
+            .catch(e => showToast("Error cargando información del lead."));
+        }
+        
+        function switchTab(tab) {
+            document.querySelectorAll('.view-panel').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            if(tab === 'leads') refreshLeads();
+            if(tab === 'config') loadInventoryPreview();
+        }
+
+        function toggleCRM() { 
+            document.getElementById('crm-panel').classList.toggle('open'); 
+        }
+
+        function closeChat() { 
+            document.body.classList.remove('mobile-chat-open'); 
+            currentChat = null; 
+            if(currentlyPlaying) { 
+                currentlyPlaying.pause(); 
+                currentlyPlaying = null; 
+            }
+            document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+        }
+
+        function debounceSearch(val) { 
+            clearTimeout(searchTimeout); 
+            searchTimeout = setTimeout(() => syncChats(), 300); 
+        }
+
+        function startNewChat() { 
+            const phone = prompt("Ingresa el número (con indicativo):"); 
+            if (!phone) return; 
+            const name = prompt("Nombre:") || phone; 
+            openChat(phone.replace(/\D/g, ''), name, ''); 
+        }
+
+        function startSyncLoop() { 
+            syncChats(); 
+        }
+        
+        async function loadTagFilterOptions() { 
+            try { 
+                const tagsResponse = await fetch('/api/data/tags');
+                const tags = await tagsResponse.json(); 
+                window._cachedTags = tags; 
+                
+                const html = '<option value="">Todas las etiquetas</option>' + tags.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+                document.getElementById('tag-filter').innerHTML = html;
+                
+                document.getElementById('bulk-tag-select').innerHTML = '<option value="">Etiquetar como...</option>' + tags.map(t => `<option value='${JSON.stringify({text:t.name, color:t.color})}'>${t.name}</option>`).join('');
+            } catch(e) {
+                console.error("Error cargando filtros de etiquetas:", e);
+            } 
+        }
+        
+        async function syncChats() { 
+            try { 
+                const search = document.getElementById('main-search').value; 
+                const res = await fetch(`/api/chats-full?view=${currentFilter}&search=${search}`); 
+                chatsData = await res.json(); 
+                
+                const tagFilter = document.getElementById('tag-filter').value; 
+                if(tagFilter) {
+                    chatsData = chatsData.filter(c => c.labels && c.labels.some(l => (l.text || l) === tagFilter)); 
+                }
+                
+                chatsData.sort((a, b) => new Date(b.lastMessage.time) - new Date(a.lastMessage.time)); 
+                chatsData.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)); 
+                
+                renderChatList(); 
+            } catch(e) {
+                console.error("Error sincronizando chats:", e);
+            } 
+        }
+
+        function setChatFilter(filter, el) { 
+            currentFilter = filter; 
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active')); 
+            el.classList.add('active'); 
+            syncChats(); 
+        }
+
+        function normalizeTag(tag) { 
+            return typeof tag === 'string' ? { text: tag, color: '#555' } : tag; 
+        }
+        
+        function toggleBulkMode() {
+            bulkMode = !bulkMode;
+            const btn = document.getElementById('bulk-toggle-btn');
+            const toolbar = document.getElementById('bulk-toolbar');
+            const panel = document.getElementById('chat-list-panel');
+            
+            if (bulkMode) { 
+                btn.classList.add('active'); 
+                panel.classList.add('bulk-mode'); 
+                toolbar.classList.add('show');
+            } else { 
+                btn.classList.remove('active'); 
+                panel.classList.remove('bulk-mode'); 
+                toolbar.classList.remove('show'); 
+                selectedChats.clear(); 
+                renderChatList(); 
+            }
+        }
+
+        function toggleChatSelection(phone, event) {
+            if (!bulkMode) return;
+            event.stopPropagation();
+            
+            if (selectedChats.has(phone)) {
+                selectedChats.delete(phone); 
+            } else {
+                selectedChats.add(phone);
+            }
+            
+            document.getElementById('bulk-count').innerText = selectedChats.size;
+            renderChatList();
+        }
+
+        // FIX: Archivar de forma masiva reconstruido para soportar la limitación del backend
+        async function executeBulkAction(action) {
+            if (selectedChats.size === 0) return alert("Selecciona al menos un chat");
+            
+            let value = null;
+            if (action === 'set_label') {
+                const valStr = document.getElementById('bulk-tag-select').value;
+                if (!valStr) return alert("Selecciona una etiqueta");
+                value = JSON.parse(valStr); 
+                action = 'add_label';
+                
+                selectedChats.forEach(phone => updateTagsOptimistic(phone, value, false));
+            }
+            
+            if (!confirm(`¿Aplicar acción a ${selectedChats.size} chats?`)) return;
+            
+            if (action === 'toggle_archive') {
+                // El backend actual no soporta toggle_archive en bulk-update, iteramos la accion
+                const promises = Array.from(selectedChats).map(phone => 
+                    fetch('/api/chat/action', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ phone: phone, action: 'toggle_archive', value: true })
+                    })
+                );
+                await Promise.all(promises);
+            } else {
+                await fetch('/api/contacts/bulk-update', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ 
+                        phones: Array.from(selectedChats), 
+                        action: action, 
+                        value: value 
+                    }) 
+                });
+            }
+            
+            showToast("✅ Acción masiva completada"); 
+            toggleBulkMode(); 
+            syncChats();
+        }
+        
+        function renderChatList() {
+            const container = document.getElementById('chat-list-container'); 
+            const scroll = container.children.length > 0 ? container.scrollTop : 0;
+            
+            container.innerHTML = chatsData.map(c => {
+                let labelsHtml = ''; 
+                if(c.labels && Array.isArray(c.labels)) {
+                    labelsHtml = c.labels.map(l => { 
+                        const tag = normalizeTag(l); 
+                        return `<span class="mini-tag" style="background:${tag.color}20; color:${tag.color}; border:1px solid ${tag.color}50">${tag.text}</span>`;
+                    }).join('');
+                }
+                
+                let sourceBadge = '';
+                if(c.source && c.source.includes('Ads')) {
+                    sourceBadge = `<span class="badge" style="background:#ff0000; color:#fff;">ADS</span>`;
+                } else if(c.source === 'Web') {
+                    sourceBadge = `<span class="badge" style="background:#1e3a8a; color:#fff;">WEB</span>`;
+                } else if(c.source === 'Tienda Virtual') {
+                    sourceBadge = `<span class="badge" style="background:#a21caf; color:#fff;">TIENDA</span>`;
+                }
+                
+                const isSelected = selectedChats.has(c.id);
+
+                return `
+                <div id="chat-${c.id}" class="chat-item ${currentChat === c.id ? 'active' : ''} ${c.archived ? 'archived' : ''}" onclick="openChat('${c.id}', decodeURIComponent('${encodeURIComponent(c.name)}'), '${c.photoUrl || ''}')" oncontextmenu="showContextMenu(event, '${c.id}', ${c.pinned}, ${c.archived})">
+                    <input type="checkbox" class="bulk-checkbox" ${isSelected ? 'checked' : ''} onclick="toggleChatSelection('${c.id}', event)">
+                    <div class="avatar">${c.photoUrl ? `<img src="${c.photoUrl}" style="width:100%;height:100%;object-fit:cover;">` : '<i class="fas fa-user"></i>'}</div>
+                    <div class="chat-info">
+                        <div class="chat-name">
+                            <span>${c.name} ${c.pinned ? '<i class="fas fa-thumbtack pin-icon" style="color:var(--primary); font-size:0.8rem;"></i>' : ''}</span>
+                            <span class="chat-date" style="font-weight:400; font-size:0.75rem;">${new Date(c.lastMessage.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        </div>
+                        <div class="chat-preview">
+                            <span class="chat-last-msg">${c.lastMessage.text || 'Multimedia'}</span>
+                            <div style="display:flex; gap:3px;">${c.unreadCount > 0 ? `<span class="badge">${c.unreadCount}</span>` : ''}${sourceBadge}</div>
+                        </div>
+                        <div class="mini-tags">${labelsHtml}</div>
+                    </div>
+                </div>`;
+            }).join(''); 
+            
+            if(scroll > 0) container.scrollTop = scroll;
+        }
+
+        function showContextMenu(e, phone, isPinned, isArchived) { 
+            e.preventDefault(); 
+            contextPhone = phone; 
+            const menu = document.getElementById('context-menu'); 
+            const pinBtn = document.getElementById('ctx-pin'); 
+            
+            pinBtn.innerHTML = isPinned ? '<i class="fas fa-thumbtack" style="opacity:0.5"></i> <span>Desfijar Chat</span>' : '<i class="fas fa-thumbtack"></i> <span>Fijar Chat</span>'; 
+            pinBtn.onclick = () => contextAction('toggle_pin'); 
+            
+            const archBtn = document.getElementById('ctx-archive'); 
+            archBtn.innerHTML = isArchived ? '<i class="fas fa-box-open"></i> <span>Desarchivar</span>' : '<i class="fas fa-archive"></i> <span>Archivar</span>'; 
+            archBtn.onclick = () => contextAction('toggle_archive'); 
+            
+            menu.style.display = 'block'; 
+            menu.style.left = e.pageX + 'px'; 
+            menu.style.top = e.pageY + 'px'; 
+        }
+
+        async function contextAction(action, valueOverride = true) { 
+            if(!contextPhone) return; 
+            if(action === 'delete' && !confirm("¿ELIMINAR CHAT ESTÁ SEGURO?")) return; 
+            
+            await fetch('/api/chat/action', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ phone: contextPhone, action: action, value: valueOverride }) 
+            }); 
+            
+            syncChats(); 
+            document.getElementById('context-menu').style.display = 'none'; 
+        }
+
+        function quickLabel() { 
+            if(!contextPhone) return; 
+            const chat = chatsData.find(c => c.id === contextPhone); 
+            
+            if(chat) {
+                openChat(chat.id, chat.name, chat.photoUrl); 
+            }
+            
+            document.getElementById('crm-panel').classList.add('open'); 
+            document.getElementById('context-menu').style.display = 'none'; 
+        }
+        
+        async function openChat(phone, name, photo) { 
+            if(bulkMode) return toggleChatSelection(phone, event); 
+            
+            document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+            const clickedItem = document.getElementById(`chat-${phone}`);
+            if(clickedItem) clickedItem.classList.add('active');
+            
+            currentChat = phone; 
+            document.body.classList.add('mobile-chat-open'); 
+            document.getElementById('conversation-view').style.display = 'flex'; 
+            document.getElementById('chat-header-name').innerText = name; 
+            document.getElementById('chat-header-phone').innerText = '+' + phone; 
+            
+            const headerAvatar = document.getElementById('chat-header-avatar');
+            if(photo) { 
+                headerAvatar.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`; 
+            } else { 
+                headerAvatar.innerHTML = `<i class="fas fa-user"></i>`; 
+            }
+            
+            document.getElementById('messages-container').innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; color:var(--text-muted); flex-direction:column; gap:10px;"><i class="fas fa-circle-notch fa-spin fa-2x" style="color:var(--primary);"></i><span style="font-size:0.9rem;">Cargando historial...</span></div>`; 
+            
+            const chatInfo = chatsData.find(c => c.id === phone); 
+            document.getElementById('bot-switch').checked = chatInfo ? chatInfo.botActive : true; 
+            
+            loadLeadDataToCRM(phone); 
+            
+            if (window._cachedTags && window._cachedTags.length > 0) {
+                renderCRMTags(window._cachedTags);
+            } else {
+                loadTags(phone); 
+            }
+
+            await loadMessages(phone, true); 
+        }
+        
+        function formatSmartTime(iso) {
+            if(!iso) return '';
+            const d = new Date(iso); 
+            const now = new Date();
+            const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            const timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            if (isToday) return timeStr;
+            
+            const dateStr = d.toLocaleDateString([], {day: '2-digit', month: '2-digit', year:'2-digit'});
+            return `${dateStr} ${timeStr}`;
+        }
+
+        // FIX: Inyección de HTML segura para Reenviar
+        function buildMessageHTML(m) {
+            let text = m.text; 
+            let isMedia = false; 
+            let mediaId = null;
+            
+            if(text.includes('[MEDIA:')) { 
+                isMedia = true;
+                const parts = text.split(':'); 
+                const type = parts[1]; 
+                const id = parts[2].split(']')[0].replace(/\D/g, ''); 
+                const extraCaption = text.split(']').slice(1).join(']').trim(); 
+                mediaId = id; 
+                const mediaUrl = `/api/media-proxy/${id}?v=final`; 
+                let captionHtml = extraCaption ? `<div style="margin-top:8px; font-size:0.9rem;">${extraCaption}</div>` : '';
+
+                if(type === 'IMAGE') { 
+                    text = `
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <img src="${mediaUrl}" style="max-width:250px; border-radius:8px; cursor:pointer; min-height:100px; background:var(--border); transition:transform 0.2s;" onclick="openLightbox('${mediaUrl}', 'IMAGE')" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+                        <div style="display:none; color:#ef4444; font-size:0.8rem; padding:10px; border:1px dashed #ef4444; border-radius:8px;">⚠️ Error de imagen.</div>
+                        ${captionHtml}
+                    </div>`; 
+                }
+                else if(type === 'VIDEO') {
+                    text = `
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <div style="position:relative; width:250px; cursor:pointer; overflow:hidden; border-radius:8px; background:#000; transition:transform 0.2s;" onclick="openLightbox('${mediaUrl}', 'VIDEO')" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                            <video src="${mediaUrl}" style="width:100%; opacity:0.8;" preload="metadata"></video>
+                            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(233,82,30,0.8); border-radius:50%; width:45px; height:45px; display:flex; align-items:center; justify-content:center; color:white;">
+                                <i class="fas fa-play" style="margin-left:3px;"></i>
+                            </div>
+                        </div>
+                        ${captionHtml}
+                    </div>`;
+                }
+                else if(type === 'AUDIO') {
+                    text = `
+                    <div class="audio-wrapper">
+                        <button class="play-btn" id="btn-${id}" onclick="togglePlay('${id}', '${mediaUrl}')">
+                            <i class="fas fa-play" style="margin-left:3px;"></i>
+                        </button>
+                        <div class="audio-progress">
+                            <input type="range" class="wa-slider" id="seek-${id}" min="0" max="100" value="0" onchange="seekAudio('${id}', this.value)" oninput="pauseForSeek('${id}')">
+                            <div class="audio-time">
+                                <span id="time-${id}">0:00</span>
+                                <span id="dur-${id}"></span>
+                            </div>
+                        </div>
+                        <audio id="audio-${id}" ontimeupdate="updateProgress('${id}')" onloadedmetadata="setAudioDuration('${id}')" onended="resetPlayer('${id}')" onplaying="onAudioStart('${id}')" style="display:none;"></audio>
+                        <a href="${mediaUrl}" download="nota_voz.ogg" class="btn-download-audio" title="Descargar Audio">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>`;
+                } else { 
+                    text = `
+                    <a href="${mediaUrl}" target="_blank" style="color:white; text-decoration:none; display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.2); padding:10px; border-radius:6px; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                        <i class="fas fa-file-download" style="font-size:1.5rem;"></i>
+                        <div style="display:flex; flex-direction:column;">
+                            <span>Archivo Adjunto (${type})</span>
+                            <span style="font-size:0.75rem; font-weight:600; color:#FFF;">Clic para descargar</span>
+                        </div>
+                    </a>
+                    ${captionHtml}`; 
+                }
+            } 
+            
+            const isAlert = text.includes('[ALERTA:');
+            const isCampaign = text.startsWith('[CAMPAÑA]');
+            
+            if (isCampaign) {
+                text = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="text-decoration:underline;">$1</a>');
+            }
+            
+            const bubbleClass = isAlert ? 'alert' : (isCampaign ? 'campaign' : m.role);
+            
+            return `
+            <div class="msg ${bubbleClass}">
+                ${text.replace(/\n/g, '<br>')}
+                <div class="msg-time">${formatSmartTime(m.time)}</div>
+                ${!isAlert ? `
+                <div class="msg-forward-btn" onclick="openForwardModal(decodeURIComponent('${encodeURIComponent(m.text)}'), ${isMedia}, '${mediaId}')" title="Reenviar Mensaje">
+                    <i class="fas fa-share"></i>
+                </div>` : ''}
+            </div>`;
+        }
+
+        async function loadMessages(phone, scrollDown) {
+            try { 
+                const res = await fetch(`/api/chat-history/${phone}`); 
+                const msgs = await res.json(); 
+                
+                if(currentChat !== phone) return; 
+                
+                const container = document.getElementById('messages-container');
+                container.innerHTML = msgs.map(m => buildMessageHTML(m)).join(''); 
+                
+                if(scrollDown) {
+                    setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+                }
+            } catch(e) {
+                console.error("Error cargando historial de mensajes:", e);
+            }
+        }
+
+        function openForwardModal(content, isMedia, mediaId) {
+            msgToForward = { content, isMedia, mediaId };
+            let preview = isMedia ? "Multimedia (Imagen/Audio/Video/Doc)" : content.substring(0, 50) + "...";
+            
+            document.getElementById('forward-preview').innerText = "Reenviando: " + preview;
+            document.getElementById('forward-modal').classList.add('show'); 
+            renderForwardList(chatsData);
+        }
+
+        function filterForwardList() { 
+            const term = document.getElementById('forward-search').value.toLowerCase(); 
+            const filtered = chatsData.filter(c => c.name.toLowerCase().includes(term) || c.id.includes(term)); 
+            renderForwardList(filtered); 
+        }
+
+        function renderForwardList(list) { 
+            document.getElementById('forward-list').innerHTML = list.map(c => `
+            <div style="padding:12px 15px; border-bottom:1px solid var(--border); cursor:pointer; display:flex; align-items:center; gap:12px; transition:background 0.2s;" onmouseover="this.style.background='var(--hover-item)'" onmouseout="this.style.background='transparent'" onclick="executeForward('${c.id}')">
+                <div class="avatar" style="width:35px; height:35px;">${c.photoUrl ? `<img src="${c.photoUrl}" style="width:100%;height:100%;">` : '<i class="fas fa-user"></i>'}</div>
+                <div style="font-size:0.95rem; font-weight:500; color:var(--text);">${c.name}</div>
+            </div>`).join(''); 
+        }
+
+        async function executeForward(targetPhone) {
+            if(!msgToForward) return; 
+            closeModal('forward-modal');
+            
+            await fetch('/api/chat/send', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ phone: targetPhone, message: msgToForward.content }) 
+            });
+            showToast("Mensaje reenviado exitosamente");
+        }
+
+        async function togglePlay(id, url) { 
+            const audio = document.getElementById(`audio-${id}`); 
+            const btn = document.getElementById(`btn-${id}`); 
+            
+            if (audio.paused) { 
+                if (currentlyPlaying && currentlyPlaying !== audio) { 
+                    currentlyPlaying.pause(); 
+                    resetPlayer(currentlyPlaying.id.replace('audio-', '')); 
+                } 
+                
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; 
+                if (!audio.src || audio.src === window.location.href) { 
+                    audio.src = url; 
+                    audio.load(); 
+                }
+                
+                audio.play()
+                .then(() => { 
+                    currentlyPlaying = audio; 
+                })
+                .catch((error) => { 
+                    btn.innerHTML = '<i class="fas fa-play" style="margin-left:3px;"></i>'; 
+                });
+            } else { 
+                audio.pause(); 
+                btn.innerHTML = '<i class="fas fa-play" style="margin-left:3px;"></i>'; 
+            } 
+        }
+
+        function onAudioStart(id) { 
+            document.getElementById(`btn-${id}`).innerHTML = '<i class="fas fa-pause"></i>'; 
+        }
+
+        function updateProgress(id) { 
+            const audio = document.getElementById(`audio-${id}`); 
+            const slider = document.getElementById(`seek-${id}`); 
+            const time = document.getElementById(`time-${id}`); 
+            
+            if (audio && audio.duration && !audio.paused) { 
+                const percent = (audio.currentTime / audio.duration) * 100; 
+                slider.value = percent; 
+                const mins = Math.floor(audio.currentTime / 60); 
+                const secs = Math.floor(audio.currentTime % 60); 
+                time.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`; 
+            } 
+        }
+
+        function setAudioDuration(id) { 
+            const audio = document.getElementById(`audio-${id}`); 
+            const durText = document.getElementById(`dur-${id}`); 
+            
+            if (audio.duration && isFinite(audio.duration)) { 
+                const mins = Math.floor(audio.duration / 60); 
+                const secs = Math.floor(audio.duration % 60); 
+                durText.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`; 
+            } 
+        }
+
+        function pauseForSeek(id) { 
+            const audio = document.getElementById(`audio-${id}`); 
+            if(!audio.paused) audio.pause(); 
+        }
+
+        function seekAudio(id, value) { 
+            const audio = document.getElementById(`audio-${id}`); 
+            if(audio.duration) { 
+                audio.currentTime = (value / 100) * audio.duration; 
+                audio.play(); 
+                document.getElementById(`btn-${id}`).innerHTML = '<i class="fas fa-pause"></i>'; 
+                currentlyPlaying = audio; 
+            } 
+        }
+
+        function resetPlayer(id) { 
+            document.getElementById(`btn-${id}`).innerHTML = '<i class="fas fa-play" style="margin-left:3px;"></i>'; 
+            document.getElementById(`seek-${id}`).value = 0; 
+            const time = document.getElementById(`time-${id}`); 
+            if(time) time.innerText = "0:00"; 
+        }
+
+        async function uploadFile() {
+            const input = document.getElementById('file-upload'); 
+            if(!input.files[0]) return;
+            
+            const formData = new FormData(); 
+            formData.append('file', input.files[0]); 
+            formData.append('phone', currentChat);
+            
+            let type = 'document';
+            if (input.files[0].type.startsWith('image/')) type = 'image';
+            else if (input.files[0].type.startsWith('audio/')) type = 'audio';
+            else if (input.files[0].type.startsWith('video/')) type = 'video';
+            
+            formData.append('type', type);
+            showToast("Enviando archivo... ⏳");
+            
+            await fetch('/api/chat/upload-send', { method: 'POST', body: formData }); 
+            input.value = ''; 
+        }
+
+        async function sendMessage() { 
+            const txt = document.getElementById('msg-input').value; 
+            if(!txt) return; 
+            document.getElementById('msg-input').value = ''; 
+            
+            await fetch('/api/chat/send', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ phone: currentChat, message: txt }) 
+            }); 
+        }
+
+        function checkEnter(e) { 
+            if(e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                sendMessage(); 
+            } 
+        }
+
+        async function toggleBotActive() { 
+            const active = document.getElementById('bot-switch').checked; 
+            
+            await fetch('/api/chat/toggle-bot', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ phone: currentChat, active }) 
+            }); 
+            
+            showToast(active ? "🤖 ICBOT Activado" : "⏸️ ICBOT Pausado"); 
+        }
+        
+        async function loadLeadDataToCRM(phone) { 
+            document.getElementById('crm-name').value = ""; 
+            document.getElementById('crm-city').value = ""; 
+            document.getElementById('crm-dept').value = ""; 
+            document.getElementById('crm-email').value = ""; 
+            document.getElementById('crm-interest').value = ""; 
+            document.getElementById('crm-specific-interest').value = ""; 
+            document.getElementById('crm-phone').value = phone ? "+" + phone : ""; 
+            document.getElementById('crm-executive').value = "Pendiente"; 
+            
+            const res = await fetch('/api/data/leads'); 
+            const leads = await res.json(); 
+            const lead = leads.find(l => l.phone === phone); 
+            
+            if(lead) { 
+                document.getElementById('crm-name').value = lead.nombre || ""; 
+                document.getElementById('crm-city').value = lead.ciudad || ""; 
+                document.getElementById('crm-dept').value = lead.departamento || ""; 
+                document.getElementById('crm-email').value = lead.correo || ""; 
+                document.getElementById('crm-specific-interest').value = lead.producto_especifico || ""; 
+                
+                let interestSelect = document.getElementById('crm-interest'); 
+                let foundInterest = false;
+                
+                if(lead.interes) { 
+                    for(let opt of interestSelect.options) { 
+                        if(opt.value.toUpperCase() === lead.interes.toUpperCase()) { 
+                            interestSelect.value = opt.value; 
+                            foundInterest = true; 
+                            break; 
+                        } 
+                    } 
+                    if(!foundInterest) interestSelect.value = "Consultando"; 
+                }
+                
+                let execSelect = document.getElementById('crm-executive'); 
+                if (lead.etiqueta && executivesMap[lead.etiqueta]) { 
+                    execSelect.value = lead.etiqueta; 
+                } else { 
+                    execSelect.value = "Pendiente"; 
+                }
+            }
+        }
+
+        async function saveLeadManual() { 
+            if(!currentChat) return; 
+            
+            const res = await fetch('/api/data/leads'); 
+            const leads = await res.json(); 
+            const lead = leads.find(l => l.phone === currentChat); 
+            const id = lead ? lead.id : null; 
+            
+            if(id) { 
+                const updates = [ 
+                    {field:'nombre', value:document.getElementById('crm-name').value}, 
+                    {field:'ciudad', value:document.getElementById('crm-city').value}, 
+                    {field:'correo', value:document.getElementById('crm-email').value}, 
+                    {field:'interes', value:document.getElementById('crm-interest').value}, 
+                    {field:'producto_especifico', value:document.getElementById('crm-specific-interest').value}, 
+                    {field:'etiqueta', value:document.getElementById('crm-executive').value} 
+                ]; 
+                
+                for(let u of updates) { 
+                    await fetch('/api/leads/update', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({ id, field: u.field, value: u.value }) 
+                    }); 
+                }
+                
+                showToast("✅ Base de Datos Actualizada"); 
+                refreshLeads(); 
+            } else { 
+                showToast("⚠️ Espera un primer mensaje del cliente."); 
+            } 
+        }
+
+        function toggleAllLeads(source) {
+            let checkboxes = document.querySelectorAll('.lead-checkbox');
+            for (let i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = source.checked;
+            }
+        }
+
+        function loadTags(phone) { 
+            const container = document.getElementById('tag-list'); 
+            container.innerHTML = "Cargando..."; 
+            renderCRMTags(window._cachedTags || []);
+        }
+
+        function renderCRMTags(tags) {
+            const container = document.getElementById('tag-list');
+            const chat = chatsData.find(c => c.id === currentChat); 
+            const activeTags = chat ? (chat.labels || []) : []; 
+
+            container.innerHTML = tags.map(t => { 
+                const isActive = activeTags.find(l => l.text === t.name); 
+                return `<div class="tag ${isActive ? 'selected' : ''}" style="${isActive ? `background:${t.color}; border-color:${t.color};` : ''}" onclick="toggleTagLocal(decodeURIComponent('${encodeURIComponent(t.name)}'), '${t.color}')">${t.name}</div>`; 
+            }).join(''); 
+        }
+
+        async function toggleTagLocal(name, color) { 
+            if(!currentChat) return; 
+            
+            const chat = chatsData.find(c => c.id === currentChat);
+            const activeTags = chat ? (chat.labels || []) : [];
+            const exists = activeTags.find(l => l.text === name);
+            
+            const tagObj = { text: name, color: color };
+            updateTagsOptimistic(currentChat, tagObj, !!exists);
+            
+            renderCRMTags(window._cachedTags);
+            
+            try {
+                let newTags = [...activeTags]; 
+                if(exists) { 
+                    newTags = newTags.filter(l => l.text !== name); 
+                } else { 
+                    newTags.push(tagObj); 
+                } 
+                
+                await fetch('/api/chat/action', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ phone: currentChat, action: 'set_labels', value: newTags }) 
+                });
+            } catch(e) {
+                showToast("Error guardando etiqueta.");
+            }
+        }
+
+        async function refreshLeads() { 
+            const res = await fetch('/api/data/leads'); 
+            const data = await res.json(); 
+            const tbody = document.getElementById('leads-body'); 
+            
+            tbody.innerHTML = data.map(l => { 
+                const d = new Date(l.fecha); 
+                const f = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; 
+                
+                let sourceHTML = l.source || '-';
+                if(l.source && l.source.includes('Ads')) sourceHTML = `<span class="lead-source-tag" style="background:rgba(239, 68, 68, 0.1); color:#ef4444; border: 1px solid #ef4444;">META ADS</span>`;
+                else if(l.source === 'Web') sourceHTML = `<span class="lead-source-tag lead-source-web">WEB</span>`;
+                else if(l.source === 'Tienda Virtual') sourceHTML = `<span class="lead-source-tag lead-source-store">TIENDA</span>`;
+                else if(l.source === 'Organico') sourceHTML = `<span class="lead-source-tag" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border: 1px solid #10b981;">ORGÁNICO</span>`;
+
+                let visualTagsHTML = '';
+                if(l.status_tag && l.status_tag !== "Sin Etiqueta") {
+                    visualTagsHTML = `<span class="mini-tag" style="background:var(--panel); border:1px solid var(--border); color:var(--text);">${l.status_tag}</span>`;
+                }
+
+                const execName = executivesMap[l.etiqueta] || l.etiqueta || 'Pendiente';
+
+                return `<tr>
+                    <td><input type="checkbox" class="lead-checkbox" value="${l.id}" style="cursor:pointer; width:16px; height:16px;"></td>
+                    <td>${f}</td>
+                    <td>${sourceHTML}</td>
+                    <td style="font-weight:600; cursor:pointer; color:var(--primary);" onclick="viewLeadDetails('${l.phone}')">${l.nombre || '-'}</td>
+                    <td><a href="https://wa.me/${l.phone}" target="_blank" style="color:var(--text); text-decoration:none;"><i class="fab fa-whatsapp" style="color:#25D366;"></i> +${l.phone}</a></td>
+                    <td>${l.ciudad || '-'}</td>
+                    <td>${l.departamento || '-'}</td>
+                    <td>${l.correo || '-'}</td>
+                    <td style="font-weight:600; color:var(--text);">${l.interes || '-'}</td>
+                    <td>${l.producto_especifico || '-'}</td>
+                    <td><span class="badge" style="background:${execName === 'Pendiente (Sin Asignar)' ? '#ef4444' : '#10b981'}">${execName}</span></td>
+                    <td>${visualTagsHTML}</td>
+                    <td>
+                        <button class="btn-small btn-red" onclick="deleteLead(${l.id})"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`; 
+            }).join(''); 
+        }
+
+        async function deleteLead(id) { 
+            if(confirm("¿Eliminar lead permanentemente?")) { 
+                await fetch('/api/leads/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id}) }); 
+                refreshLeads(); 
+            } 
+        }
+
+        async function downloadExcel() { 
+            const res = await fetch('/api/data/leads'); 
+            const data = await res.json(); 
+            
+            if(data.length === 0) return alert("No hay datos para descargar"); 
+            
+            let csv = "ID,Fecha,Fuente,Nombre,Telefono,Ciudad,Departamento,Correo,Interes_Categoria,Producto_Especifico,Ejecutivo,Etiqueta_Comercial\n"; 
+            
+            data.forEach(l => { 
+                const execName = executivesMap[l.etiqueta] || l.etiqueta || 'Pendiente';
+                const tagVisual = l.status_tag && l.status_tag !== "Sin Etiqueta" ? l.status_tag : '';
+                
+                csv += `${l.id},${l.fecha},"${l.source || ''}","${l.nombre || ''}","${l.phone || ''}","${l.ciudad || ''}","${l.departamento || ''}","${l.correo || ''}","${l.interes || ''}","${l.producto_especifico || ''}","${execName}","${tagVisual}"\n`; 
+            }); 
+            
+            const blob = new Blob([csv], { type: 'text/csv' }); 
+            const url = window.URL.createObjectURL(blob); 
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `Leads_ICBOT_${new Date().toLocaleDateString()}.csv`; 
+            a.click(); 
+        }
+
+        // FIX: Inyección HTML segura usando encodeURIComponent para prevenir Crash del UI.
+        async function loadAllConfig() {
+            try {
+                const res = await fetch('/api/data/config');
+                const configData = await res.json();
+                
+                const ptRes = await fetch('/api/config/prompt');
+                const ptData = await ptRes.json();
+                document.getElementById('prompt-readonly').innerText = ptData.prompt;
+
+                const rules = configData.tech_rules || [];
+                document.getElementById('rules-list').innerHTML = rules.map((r, i) => `
+                    <li class="config-item">
+                        <span><i class="fas fa-check-circle" style="color:var(--primary); margin-right:8px;"></i> ${r}</span>
+                        <button class="btn-small btn-red" onclick="deleteRule(${i})"><i class="fas fa-times"></i></button>
+                    </li>
+                `).join('');
+
+                const biz = configData.biz_profile || {};
+                document.getElementById('biz-name').value = biz.name || '';
+                document.getElementById('biz-hours').value = biz.hours || '';
+
+                if(configData.logo_url) {
+                    document.getElementById('logo-preview').style.backgroundImage = `url(${configData.logo_url})`;
+                }
+
+                const tagsRes = await fetch('/api/data/tags');
+                const tags = await tagsRes.json();
+                document.getElementById('config-tags-list').innerHTML = tags.map(t => `
+                    <li class="config-item">
+                        <span style="display:flex; align-items:center; gap:10px;"><div style="width:15px;height:15px;border-radius:50%;background:${t.color};"></div> ${t.name}</span>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-small btn-blue" onclick="openTagEdit(${t.id}, decodeURIComponent('${encodeURIComponent(t.name)}'), '${t.color}')"><i class="fas fa-pencil-alt"></i></button>
+                            <button class="btn-small btn-red" onclick="deleteTag(${t.id})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </li>
+                `).join('');
+
+                const shortRes = await fetch('/api/data/shortcuts');
+                const shortcuts = await shortRes.json();
+                
+                const crmShortcuts = document.getElementById('shortcuts-list');
+                crmShortcuts.innerHTML = shortcuts.map(s => `
+                    <div class="tag" style="border-color:var(--border);" onclick="insertShortcut(decodeURIComponent('${encodeURIComponent(s.text)}'))" title="${s.text}">${s.keyword}</div>
+                `).join('');
+
+                document.getElementById('config-shortcuts-list').innerHTML = shortcuts.map(s => `
+                    <li class="config-item" style="flex-direction:column; align-items:flex-start; gap:5px;">
+                        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                            <strong>${s.keyword}</strong>
+                            <button class="btn-small btn-red" onclick="deleteShortcut(${s.id})"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <span style="font-size:0.8rem; color:var(--text-muted);">${s.text}</span>
+                    </li>
+                `).join('');
+
+                const webRes = await fetch('/api/data/web-knowledge');
+                const webSources = await webRes.json();
+                document.getElementById('web-knowledge-list').innerHTML = webSources.map(w => `
+                    <li class="config-item" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; width:100%;">
+                            <a href="${w.url}" target="_blank" style="color:var(--primary); font-weight:600; text-decoration:none;"><i class="fas fa-link"></i> ${w.url}</a>
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn-small btn-blue" onclick="openWebEdit(${w.id}, decodeURIComponent('${encodeURIComponent(w.url)}'), decodeURIComponent('${encodeURIComponent(w.summary)}'))"><i class="fas fa-eye"></i> Ver/Editar</button>
+                                <button class="btn-small btn-red" onclick="deleteWeb(${w.id})"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Escaneado el: ${w.date}</span>
+                    </li>
+                `).join('');
+
+            } catch(e) { console.error("Error cargando configuración:", e); }
+        }
+
+        async function openPromptEdit() {
+            const res = await fetch('/api/config/prompt');
+            const data = await res.json();
+            document.getElementById('prompt-editor').value = data.prompt;
+            document.getElementById('prompt-edit-modal').classList.add('show');
+        }
+
+        // FIX: Feedback visual y manejo de promesas al guardar el Prompt
+        async function savePrompt(event) {
+            const newPrompt = document.getElementById('prompt-editor').value;
+            const btn = event.currentTarget;
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/config/prompt', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({prompt: newPrompt}) 
+                });
+                
+                if (res.ok) {
+                    document.getElementById('prompt-readonly').innerText = newPrompt;
+                    closeModal('prompt-edit-modal');
+                    showToast("✅ Personalidad Actualizada en el Servidor");
+                } else {
+                    showToast("❌ Fallo al guardar en base de datos");
+                }
+            } catch (e) {
+                showToast("❌ Error de red");
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+
+        async function addRule() {
+            const input = document.getElementById('rule-input');
+            if(!input.value) return;
+            await fetch('/api/config/rules/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({rule: input.value}) });
+            input.value = '';
+            loadAllConfig();
+        }
+
+        async function deleteRule(index) {
+            await fetch('/api/config/rules/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({index}) });
+            loadAllConfig();
+        }
+
+        async function saveBizConfig() {
+            const name = document.getElementById('biz-name').value;
+            const hours = document.getElementById('biz-hours').value;
+            await fetch('/api/config/biz/save', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, hours}) });
+            showToast("Perfil guardado");
+        }
+
+        async function uploadLogo(input) {
+            if(!input.files[0]) return;
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+            await fetch('/api/config/logo', { method: 'POST', body: formData });
+            showToast("Logo actualizado (Recarga para ver cambios)");
+        }
+
+        async function addTag() {
+            const name = document.getElementById('tag-name').value;
+            const color = document.getElementById('tag-color').value;
+            if(!name) return;
+            await fetch('/api/tags/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, color}) });
+            document.getElementById('tag-name').value = '';
+            loadAllConfig();
+            loadTagFilterOptions(); 
+        }
+
+        async function deleteTag(id) {
+            if(!confirm("¿Eliminar etiqueta?")) return;
+            await fetch('/api/tags/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) });
+            loadAllConfig();
+            loadTagFilterOptions(); 
+        }
+        
+        function openTagEdit(id, name, color) {
+            document.getElementById('edit-tag-id').value = id;
+            document.getElementById('edit-tag-name').value = name;
+            document.getElementById('edit-tag-color').value = color;
+            document.getElementById('tag-edit-modal').classList.add('show');
+        }
+
+        async function saveTagEdit() {
+            const id = document.getElementById('edit-tag-id').value;
+            const name = document.getElementById('edit-tag-name').value;
+            const color = document.getElementById('edit-tag-color').value;
+            
+            await fetch('/api/tags/update', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({id, name, color}) 
+            });
+            
+            closeModal('tag-edit-modal');
+            loadAllConfig();
+            loadTagFilterOptions();
+        }
+
+        async function addShortcut() {
+            const keyword = document.getElementById('short-key').value;
+            const text = document.getElementById('short-text').value;
+            if(!keyword || !text) return;
+            await fetch('/api/shortcuts/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({keyword, text}) });
+            document.getElementById('short-key').value = '';
+            document.getElementById('short-text').value = '';
+            loadAllConfig();
+        }
+
+        async function deleteShortcut(id) {
+            await fetch('/api/shortcuts/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) });
+            loadAllConfig();
+        }
+
+        function insertShortcut(text) {
+            const input = document.getElementById('msg-input');
+            input.value = text;
+            input.focus();
+        }
+
+        async function uploadCSV() {
+            const file = document.getElementById('csv-upload').files[0];
+            if(!file) return alert('Selecciona un archivo');
+            
+            const btn = event.target;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+            btn.disabled = true;
+            
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+                const res = await fetch('/api/knowledge/csv', { method:'POST', body: fd });
+                const result = await res.json();
+                if(result.success) {
+                    showToast(`✅ ${result.count} productos cargados`);
+                    loadInventoryPreview();
+                }
+            } catch(e) {
+                alert("Error procesando el archivo. Asegúrate de que sea un CSV o Excel válido.");
+            } finally {
+                btn.innerHTML = '<i class="fas fa-upload"></i> Cargar Archivo';
+                btn.disabled = false;
+                document.getElementById('csv-upload').value = '';
+            }
+        }
+        
+        // FIX: Inyección Segura para Editores Dinámicos
+        async function loadInventoryPreview() {
+            try {
+                const res = await fetch('/api/data/knowledge');
+                currentInventory = await res.json();
+                
+                document.getElementById('inventory-count').innerText = `${currentInventory.length} items`;
+                
+                if(currentInventory.length === 0) {
+                    document.getElementById('inventory-list').innerHTML = '<li style="text-align:center; color:var(--text-muted); padding:10px;">Inventario vacío. Sube un archivo CSV o Excel.</li>';
+                    return;
+                }
+
+                let html = '';
+                const limit = Math.min(currentInventory.length, 100);
+                
+                for(let i = 0; i < limit; i++) {
+                    const item = currentInventory[i];
+                    let data;
+                    try { data = JSON.parse(item.raw_data); } catch(e) { data = {}; }
+                    
+                    const nombre = data.nombre || data.producto || data.name || data.descripcion || "Item sin nombre";
+                    const precio = data.precio || data.price || "N/A";
+                    
+                    html += `
+                    <li class="config-item" style="flex-direction:column; align-items:flex-start; gap:5px;">
+                        <div style="display:flex; justify-content:space-between; width:100%;">
+                            <strong style="font-size:0.9rem;">${nombre}</strong>
+                            <div style="display:flex; gap:5px;">
+                                <span class="badge" style="background:var(--panel); color:var(--text); border:1px solid var(--border);">$${precio}</span>
+                                <button class="btn-small btn-blue" style="padding:4px 8px;" onclick="openEditInventory(${item.id}, decodeURIComponent('${encodeURIComponent(item.raw_data)}'))"><i class="fas fa-pencil-alt"></i></button>
+                                <button class="btn-small btn-red" style="padding:4px 8px;" onclick="deleteInventoryItem(${item.id})"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                        <span style="font-size:0.75rem; color:var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; width: 100%; display: inline-block;">
+                            Búsqueda: ${item.searchable}
+                        </span>
+                    </li>`;
+                }
+                
+                if(currentInventory.length > 100) {
+                    html += `<li style="text-align:center; padding:10px; color:var(--text-muted); font-size:0.85rem;">... y ${currentInventory.length - 100} items más. Mostrando solo los primeros 100.</li>`;
+                }
+                
+                document.getElementById('inventory-list').innerHTML = html;
+            } catch(e) {
+                console.error("Error cargando inventario:", e);
+            }
+        }
+        
+        function openEditInventory(id, rawDataStr) {
+            try {
+                const data = JSON.parse(rawDataStr);
+                document.getElementById('edit-id').value = id;
+                document.getElementById('edit-nombre').value = data.nombre || data.producto || data.name || data.descripcion || "";
+                document.getElementById('edit-precio').value = data.precio || data.price || "";
+                document.getElementById('edit-stock').value = data.stock || data.disponibilidad || "";
+                document.getElementById('edit-desc').value = data.descripcion_larga || data.detalle || "";
+                document.getElementById('edit-modal').classList.add('show');
+            } catch(e) {
+                alert("Error abriendo editor");
+            }
+        }
+        
+        async function saveEditInventory() {
+            const id = document.getElementById('edit-id').value;
+            
+            const item = currentInventory.find(i => i.id == id);
+            let data = {};
+            if(item) {
+                try { data = JSON.parse(item.raw_data); } catch(e){}
+            }
+            
+            data.nombre = document.getElementById('edit-nombre').value;
+            data.precio = document.getElementById('edit-precio').value;
+            data.stock = document.getElementById('edit-stock').value;
+            data.descripcion_larga = document.getElementById('edit-desc').value;
+            
+            await fetch('/api/knowledge/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id, data })
+            });
+            
+            closeModal('edit-modal');
+            showToast("Producto actualizado");
+            loadInventoryPreview();
+        }
+
+        async function deleteInventoryItem(id) {
+            if(!confirm("¿Eliminar este producto?")) return;
+            await fetch('/api/knowledge/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id}) });
+            loadInventoryPreview();
+        }
+
+        async function clearInventory() {
+            if(!confirm("⚠️ ¡PELIGRO! ¿Estás seguro de querer BORRAR TODO EL INVENTARIO? Esta acción no se puede deshacer.")) return;
+            const res = await fetch('/api/knowledge/clear', { method: 'POST' });
+            if(res.ok) {
+                showToast("Inventario borrado por completo");
+                loadInventoryPreview();
+            }
+        }
+
+        async function scanWeb() {
+            const urlInput = document.getElementById('web-url-input');
+            const url = urlInput.value.trim();
+            if(!url) return;
+            
+            const btn = event.target;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Escaneando...';
+            btn.disabled = true;
+            
+            try {
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                const htmlText = data.contents;
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                
+                doc.querySelectorAll('script, style, nav, footer, iframe, img, svg').forEach(el => el.remove());
+                let rawText = doc.body.innerText;
+                
+                rawText = rawText.replace(/\s+/g, ' ').trim();
+                
+                const summary = `Contenido de ${url}:\n` + rawText.substring(0, 3000); 
+
+                await fetch('/api/data/web-knowledge', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ url: url, summary: summary })
+                });
+
+                showToast("✅ Página escaneada y memorizada");
+                urlInput.value = '';
+                loadAllConfig();
+            } catch(error) {
+                console.error(error);
+                alert("No se pudo escanear la página. Es posible que tenga bloqueos de seguridad.");
+            } finally {
+                btn.innerHTML = '<i class="fas fa-plus"></i> Añadir';
+                btn.disabled = false;
+            }
+        }
+
+        // FIX: El modal guarda la URL para poder reconstruirla
+        function openWebEdit(id, url, text) {
+            document.getElementById('edit-web-id').value = id;
+            document.getElementById('edit-web-id').dataset.url = url;
+            document.getElementById('web-audit-text').value = text;
+            document.getElementById('web-audit-modal').classList.add('show');
+        }
+
+        // FIX: Reconstrucción de la web, tu backend no tenía endpoint '/update'
+        async function saveWebEdit(event) {
+            const id = document.getElementById('edit-web-id').value;
+            const url = document.getElementById('edit-web-id').dataset.url;
+            const newSummary = document.getElementById('web-audit-text').value;
+            
+            const btn = event.currentTarget;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+            btn.disabled = true;
+
+            try {
+                // Como no hay endpoint update en el backend, borramos y volvemos a crear
+                await fetch('/api/data/web-knowledge/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id}) });
+                
+                await fetch('/api/data/web-knowledge', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ url: url, summary: newSummary })
+                });
+                
+                closeModal('web-audit-modal');
+                showToast("✅ Conocimiento web actualizado");
+                loadAllConfig();
+            } catch (e) {
+                showToast("❌ Error actualizando la web");
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
+
+        async function deleteWeb(id) {
+            if(!confirm("¿Olvidar esta página web?")) return;
+            await fetch('/api/data/web-knowledge/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id}) });
+            loadAllConfig();
+        }
+
+    </script>
+</body>
+</html>
